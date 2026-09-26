@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>WebAR Face Tracking - Практическая работа №3</title>
+
+    <!-- Библиотеки A-Frame v1.4.2 и MindAR Face v1.2.2 -->
+    <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.2/dist/mindar-face-aframe.prod.js"></script>
+
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #0b0f19;
+        }
+
+        /* Контейнер WebAR-сцены */
+        #ar-container {
+            position: fixed;
+            inset: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 1;
+        }
+
+        /* Верхняя панель статуса */
+        .hud-top {
+            position: fixed;
+            top: 16px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(15, 23, 42, 0.88);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 9999px;
+            padding: 8px 18px;
+            z-index: 100;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+            pointer-events: auto;
+            max-width: 90vw;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background-color: #f59e0b; /* желтый - поиск */
+            box-shadow: 0 0 8px #f59e0b;
+            transition: all 0.3s ease;
+            flex-shrink: 0;
+        }
+
+        .status-dot.active {
+            background-color: #10b981; /* зеленый - лицо обнаружено */
+            box-shadow: 0 0 10px #10b981;
+        }
+
+        .status-text {
+            color: #f8fafc;
+            font-size: 13px;
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* Видоискатель контура лица */
+        .face-guide {
+            position: fixed;
+            top: 45%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 250px;
+            height: 330px;
+            border: 2px dashed rgba(255, 255, 255, 0.4);
+            border-radius: 125px / 165px;
+            pointer-events: none;
+            z-index: 50;
+            transition: all 0.4s ease;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-end;
+            padding-bottom: 24px;
+        }
+
+        .face-guide.detected {
+            border-color: rgba(16, 185, 129, 0.7);
+            border-style: solid;
+            box-shadow: 0 0 30px rgba(16, 185, 129, 0.25);
+            opacity: 0.35;
+        }
+
+        .guide-hint {
+            color: rgba(255, 255, 255, 0.75);
+            font-size: 12px;
+            text-align: center;
+            letter-spacing: 0.5px;
+            text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+        }
+
+        /* Нижняя панель управления аксессуарами */
+        .hud-bottom {
+            position: fixed;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 8px;
+            background: rgba(15, 23, 42, 0.88);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 20px;
+            padding: 6px;
+            z-index: 100;
+            box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+            pointer-events: auto;
+        }
+
+        .btn-ctrl {
+            background: transparent;
+            border: 1px solid transparent;
+            color: #cbd5e1;
+            font-size: 13px;
+            font-weight: 500;
+            padding: 8px 14px;
+            border-radius: 14px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-ctrl:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+        }
+
+        .btn-ctrl.active {
+            background: #2563eb;
+            color: #ffffff;
+            border-color: rgba(255, 255, 255, 0.2);
+            box-shadow: 0 2px 10px rgba(37, 99, 235, 0.4);
+        }
+
+        /* Индикатор параметров стабилизации */
+        .filter-badge {
+            position: fixed;
+            bottom: 84px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.65);
+            backdrop-filter: blur(4px);
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 11px;
+            padding: 4px 12px;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            z-index: 90;
+            pointer-events: none;
+            letter-spacing: 0.3px;
+            white-space: nowrap;
+        }
+
+        /* Скрытие встроенного спиннера MindAR при кастомном интерфейсе */
+        .mindar-ui-loading, .mindar-ui-scanning {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+    <!-- HUD интерфейс поверх WebAR canvas -->
+    <div class="hud-top">
+        <div id="status-indicator" class="status-dot"></div>
+        <span id="status-label" class="status-text">Поиск лица... Наведите камеру</span>
+    </div>
+
+    <div id="face-guide-elem" class="face-guide">
+        <span class="guide-hint">Поместите лицо в контур</span>
+    </div>
+
+    <div class="filter-badge">
+        OneEuro: minCF=0.0001, beta=0.001 | Mesh: 468 points
+    </div>
+
+    <div class="hud-bottom">
+        <button id="btn-glasses" class="btn-ctrl active" onclick="setAccessory('glasses')">Очки</button>
+        <button id="btn-hat" class="btn-ctrl" onclick="setAccessory('hat')">Шляпа</button>
+        <button id="btn-both" class="btn-ctrl" onclick="setAccessory('both')">Комплект</button>
+    </div>
+
+    <!-- Основная сцена A-Frame с MindAR Face Tracking -->
+    <div id="ar-container">
+        <a-scene
+            id="ar-scene"
+            mindar-face="uiLoading: no; uiScanning: no; uiError: no; filterMinCF: 0.0001; filterBeta: 0.001"
+            color-space="sRGB"
+            renderer="colorManagement: true, physicallyCorrectLights"
+            vr-mode-ui="enabled: false"
+            device-orientation-permission-ui="enabled: false">
+
+            <a-assets>
+                <a-asset-item id="headModel" src="assets/headOccluder.glb"></a-asset-item>
+                <a-asset-item id="glassesModel" src="assets/glasses.glb"></a-asset-item>
+                <a-asset-item id="hatModel" src="assets/hat.glb"></a-asset-item>
+            </a-assets>
+
+            <!-- Основная камера сцены -->
+            <a-camera id="main-cam" position="0 0 0" look-controls="enabled: false"></a-camera>
+
+            <!-- Освещение сцены -->
+            <a-light type="ambient" intensity="1.5"></a-light>
+            <a-light type="directional" intensity="1.2" position="1 2 2"></a-light>
+            <a-light type="directional" intensity="0.8" position="-1 1 2"></a-light>
+
+            <!-- 1. Пространственный окклюдер головы (маскирование Z-buffer дужек и затылка) -->
+            <a-entity mindar-face-target="anchorIndex: 168">
+                <a-gltf-model
+                    id="occluder-entity"
+                    mindar-face-occluder
+                    position="0 -0.3 0.15"
+                    rotation="0 0 0"
+                    scale="0.065 0.065 0.065"
+                    src="#headModel">
+                </a-gltf-model>
+            </a-entity>
+
+            <!-- 2. Анкер 168: переносица (3D-очки) -->
+            <a-entity id="target-glasses" mindar-face-target="anchorIndex: 168">
+                <a-gltf-model
+                    id="glasses-entity"
+                    rotation="0 0 0"
+                    position="0 0.02 0.05"
+                    scale="0.011 0.011 0.011"
+                    src="#glassesModel"
+                    visible="true">
+                </a-gltf-model>
+            </a-entity>
+
+            <!-- 3. Анкер 10: верхний край лба (головной убор / шляпа) -->
+            <a-entity id="target-hat" mindar-face-target="anchorIndex: 10">
+                <a-gltf-model
+                    id="hat-entity"
+                    rotation="0 0 0"
+                    position="0 1.25 -0.4"
+                    scale="0.42 0.42 0.42"
+                    src="#hatModel"
+                    visible="false">
+                </a-gltf-model>
+            </a-entity>
+
+            <!-- Демонстрационный стенд (исключительно для автономного regression/headless тестирования при отсутствии камеры) -->
+            <a-entity id="sim-root" visible="false" position="0 0.05 -1.2">
+                <a-gltf-model
+                    id="sim-occluder"
+                    mindar-face-occluder
+                    position="0 0.08 -0.05"
+                    scale="0.033 0.033 0.033"
+                    src="#headModel"
+                    visible="true">
+                </a-gltf-model>
+                <a-gltf-model
+                    id="sim-glasses"
+                    position="0 0.18 0"
+                    scale="0.0036 0.0036 0.0036"
+                    src="#glassesModel"
+                    visible="true">
+                </a-gltf-model>
+                <a-gltf-model
+                    id="sim-hat"
+                    position="0 0.88 -0.15"
+                    scale="0.16 0.16 0.16"
+                    src="#hatModel"
+                    visible="false">
+                </a-gltf-model>
+            </a-entity>
+
+        </a-scene>
+    </div>
+
+    <!-- Управление логикой WebAR и обработка событий MindAR -->
+    <script>
+        let currentMode = 'glasses';
+
+        function updateUIState(isDetected, labelText) {
+            const dot = document.getElementById('status-indicator');
+            const label = document.getElementById('status-label');
+            const guide = document.getElementById('face-guide-elem');
+
+            if (isDetected) {
+                if (dot) dot.classList.add('active');
+                if (guide) guide.classList.add('detected');
+            } else {
+                if (dot) dot.classList.remove('active');
+                if (guide) guide.classList.remove('detected');
+            }
+
+            if (labelText && label) {
+                label.textContent = labelText;
+            }
+        }
+
+        function setAccessory(mode) {
+            currentMode = mode;
+            ['glasses', 'hat', 'both'].forEach(m => {
+                const btn = document.getElementById('btn-' + m);
+                if (btn) btn.classList.toggle('active', m === mode);
+            });
+
+            const showGlasses = (mode === 'glasses' || mode === 'both');
+            const showHat = (mode === 'hat' || mode === 'both');
+
+            // 1. Управление реальными entities сцены MindAR Face Tracking
+            const gEntity = document.getElementById('glasses-entity');
+            const hEntity = document.getElementById('hat-entity');
+            if (gEntity) gEntity.setAttribute('visible', showGlasses);
+            if (hEntity) hEntity.setAttribute('visible', showHat);
+
+            // 2. Управление entities симулятора (при активном demo-режиме)
+            const simG = document.getElementById('sim-glasses');
+            const simH = document.getElementById('sim-hat');
+            if (simG) simG.setAttribute('visible', showGlasses);
+            if (simH) simH.setAttribute('visible', showHat);
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const sceneEl = document.getElementById('ar-scene');
+
+            // Подписка на события MindAR Face Tracking непосредственно через элемент сцены (согласно архитектуре MindAR Face System)
+            if (sceneEl) {
+                sceneEl.addEventListener('targetFound', () => {
+                    updateUIState(true, 'Лицо обнаружено (MediaPipe Mesh: 468 точек)');
+                });
+
+                sceneEl.addEventListener('targetLost', () => {
+                    updateUIState(false, 'Поиск лица... Наведите камеру');
+                });
+
+                sceneEl.addEventListener('arReady', () => {
+                    console.log('MindAR Face System готов к работе');
+                });
+
+                sceneEl.addEventListener('arError', (event) => {
+                    console.error('Ошибка инициализации видеопотока или AR:', event.detail);
+                });
+            }
+
+            // Обработка автономного демо-режима (?demo=...) исключительно для тестирования без видеокамеры
+            const urlParams = new URLSearchParams(window.location.search);
+            const demoMode = urlParams.get('demo');
+
+            if (demoMode) {
+                const simRoot = document.getElementById('sim-root');
+                const simGlasses = document.getElementById('sim-glasses');
+                const simHat = document.getElementById('sim-hat');
+                const simOccluder = document.getElementById('sim-occluder');
+
+                if (demoMode === 'search') {
+                    updateUIState(false, 'Поиск лица... Наведите камеру');
+                    if (simRoot) simRoot.setAttribute('visible', false);
+                    setAccessory('glasses');
+                } else if (demoMode === 'glasses') {
+                    updateUIState(true, 'Демо-режим: анкер 168 (переносица)');
+                    if (simRoot) {
+                        simRoot.setAttribute('visible', true);
+                        simRoot.setAttribute('position', '0 0.05 -1.2');
+                        simRoot.setAttribute('rotation', '0 0 0');
+                    }
+                    if (simOccluder) simOccluder.setAttribute('visible', false);
+                    setAccessory('glasses');
+                } else if (demoMode === 'both') {
+                    updateUIState(true, 'Демо-режим: комплект анкеров 168 и 10');
+                    if (simRoot) {
+                        simRoot.setAttribute('visible', true);
+                        simRoot.setAttribute('position', '0 0.05 -1.2');
+                        simRoot.setAttribute('rotation', '0 0 0');
+                    }
+                    if (simOccluder) simOccluder.setAttribute('visible', true);
+                    setAccessory('both');
+                } else if (demoMode === 'tilted') {
+                    updateUIState(true, 'Демо-режим: наклон стенда 20°');
+                    if (simRoot) {
+                        simRoot.setAttribute('visible', true);
+                        simRoot.setAttribute('position', '0 0.05 -1.2');
+                        simRoot.setAttribute('rotation', '0 5 20');
+                    }
+                    if (simOccluder) simOccluder.setAttribute('visible', true);
+                    setAccessory('both');
+                }
+            }
+        });
+    </script>
+</body>
+</html>

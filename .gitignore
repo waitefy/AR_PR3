@@ -1,0 +1,9 @@
+# Lock files
+.~lock.*
+*.tmp
+
+# OS & Editor artifacts
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
