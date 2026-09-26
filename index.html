@@ -25,7 +25,7 @@
 
         <a-assets>
             <a-asset-item id="headModel" src="assets/headOccluder.glb"></a-asset-item>
-            <a-asset-item id="maskModel" src="assets/mask.glb"></a-asset-item>
+            <a-asset-item id="marioHatModel" src="assets/mario_hat.glb"></a-asset-item>
         </a-assets>
 
         <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
@@ -43,12 +43,13 @@
             </a-gltf-model>
         </a-entity>
 
-        <!-- 3D-модель маски -->
-        <a-entity mindar-face-target="anchorIndex: 168">
+        <!-- 3D-модель шапки Марио (анкер 10: верхний край лба) -->
+        <a-entity mindar-face-target="anchorIndex: 10">
             <a-gltf-model
-                position="0 -0.22 -0.23"
-                scale="0.47 0.46 0.44"
-                src="#maskModel">
+                rotation="15 0 0"
+                position="0 -0.22 -0.7"
+                scale="0.01 0.01 0.01"
+                src="#marioHatModel">
             </a-gltf-model>
         </a-entity>
     </a-scene>
