@@ -17,7 +17,7 @@
 </head>
 <body>
     <a-scene
-        mindar-face="filterMinCF: 0.0001; filterBeta: 0.001"
+        mindar-face="filterMinCF: 0.001; filterBeta: 1.0"
         color-space="sRGB"
         renderer="colorManagement: true, physicallyCorrectLights"
         vr-mode-ui="enabled: false"
@@ -25,7 +25,7 @@
 
         <a-assets>
             <a-asset-item id="headModel" src="assets/headOccluder.glb"></a-asset-item>
-            <a-asset-item id="glassesModel" src="assets/glasses.glb"></a-asset-item>
+            <a-asset-item id="maskModel" src="assets/mask.glb"></a-asset-item>
         </a-assets>
 
         <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
@@ -33,7 +33,7 @@
         <a-light type="ambient" intensity="1.2"></a-light>
         <a-light type="directional" intensity="1.0" position="1 2 1"></a-light>
 
-        <!-- Окклюдер лица для маскирования дужек в Z-буфере -->
+        <!-- Окклюдер лица для маскирования затылка и контуров головы в Z-буфере -->
         <a-entity mindar-face-target="anchorIndex: 168">
             <a-gltf-model
                 mindar-face-occluder
@@ -43,12 +43,12 @@
             </a-gltf-model>
         </a-entity>
 
-        <!-- 3D-модель очков -->
+        <!-- 3D-модель маски -->
         <a-entity mindar-face-target="anchorIndex: 168">
             <a-gltf-model
-                position="0 0.02 0.05"
-                scale="0.011 0.011 0.011"
-                src="#glassesModel">
+                position="0 -0.22 -0.23"
+                scale="0.47 0.46 0.44"
+                src="#maskModel">
             </a-gltf-model>
         </a-entity>
     </a-scene>
